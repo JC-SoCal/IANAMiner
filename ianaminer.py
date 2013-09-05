@@ -11,7 +11,6 @@ def GetIP(domain):
   except:
       return False
  
- 
 def queryWhois(query, server='whois.ripe.net'):
   s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
   while 1:
@@ -54,16 +53,37 @@ def queryWhois(query, server='whois.ripe.net'):
   return page      
 
 def parseWhois(data, flags):
-  data = {}
+  result = {}
+
   for line in data.split('\n'):
     if line.startswith('#') or len(line) == 0:
       continue
+    split = line.split(':',1)
+    term = split[0]
+    detail = split[1].strip()
+    
+    id_count = 1
 
+    orig_term = term
+    while term in result.keys():
+      term = orig_term+str(id_count)
+      id_count+=1
 
-    term = line.split(':')[0]
-    detail = line.split(':')[1].strip()
-    print term, '-->',detail
-    print line
+    result[term] = detail
+
+  return result
+
+def prepareData(ips):
+  for server in ['whois.arin.net', 'whois.ripe.net', 'whois.apnic.net', 'whois.lacnic.net', 'whois.afrinic.net']:
+    try:
+      res = queryWhois(ip, server)
+      parsedRes = parseWhois(res,'')
+      parsedRes['Domain'] = domain
+      parsedRes['IP Address'] = ip
+      break # we only need the info once
+    except:
+      pass
+  return parsedRes
 
 
 
@@ -71,31 +91,14 @@ def parseWhois(data, flags):
 
  
 f = open('list.txt', 'r')
-for x in f:
-  d = x.strip()
-  ips = GetIP(d)
+listdb = []
+for item in f:
+  domain = item.strip()
+  ips = GetIP(domain)
   if ips:
-    
- 
     for ip in ips:
-      for server in ['whois.arin.net', 'whois.ripe.net', 'whois.apnic.net', 'whois.lacnic.net', 'whois.afrinic.net']:
-        try:
-          res = queryWhois(ip, server)
-          #print '======', server
-          orgname = ''
-          parseWhois(res,'')
-          print res
+      listdb.append(prepareData(ip))
 
-          for x in res.split('\n'):
-
-            if x.startswith('OrgName:'):
-              orgname = x.split(':')[1].strip()
-          break # we only need the info once
-        except:
-          pass
- 
-      #report
-      #print d, 'has ip:', ip, 'which according to', server, 'is owned by:', orgname
- 
-  else:
-    print 'WARNING: no IP addresses found for', d
+  
+for x in listdb:
+  print x
